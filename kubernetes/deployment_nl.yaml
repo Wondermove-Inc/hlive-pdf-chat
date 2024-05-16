@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hlive-chat-nl
+  namespace: hlive-chat
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hlive-chat-nl
+  template:
+    metadata:
+      labels:
+        app: hlive-chat-nl
+    spec:
+      containers:
+        - name: hlive-chat-container
+          image: skuber.azurecr.io/hlive_chat:nl
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8503
+      imagePullSecrets:
+        - name: acr-hlive-secret

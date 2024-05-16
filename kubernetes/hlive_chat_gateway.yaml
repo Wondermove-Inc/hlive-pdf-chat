@@ -1,0 +1,25 @@
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: hlive-chat-gateway
+  namespace: hlive-chat
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      name: http
+      number: 80
+      protocol: HTTP
+    hosts:
+    - hlive-chat.wondermove.net
+
+  - port:
+      name: https
+      number: 443
+      protocol: HTTPS
+    hosts:
+    - hlive-chat.wondermove.net
+    tls:
+      mode: SIMPLE
+      credentialName: hlive-chat-tls

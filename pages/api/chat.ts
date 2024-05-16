@@ -12,9 +12,6 @@ export default async function handler(
 ) {
   const { question, history } = req.body;
 
-  console.log('question', question);
-  console.log('history', history);
-
   //only accept post requests
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
@@ -36,7 +33,7 @@ export default async function handler(
       {
         pineconeIndex: index,
         textKey: 'text',
-        namespace: PINECONE_NAME_SPACE, //namespace comes from your config folder
+        namespace: PINECONE_NAME_SPACE,
       },
     );
 
@@ -63,7 +60,6 @@ export default async function handler(
         return [`Human: ${message[0]}`, `Assistant: ${message[1]}`].join('\n');
       })
       .join('\n');
-    console.log(pastMessages);
 
     //Ask a question using chat history
     const response = await chain.invoke({

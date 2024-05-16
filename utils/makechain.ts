@@ -29,6 +29,30 @@ If the question is not related to the context or chat history, politely respond 
 Question: {question}
 Helpful answer in markdown:`;
 
+const CONDENSE_NL_TEMPLATE = `Gegeven het volgende gesprek en een vervolgvraag, herschrijf de vervolgvraag tot een op zichzelf staande vraag.
+
+<chat_history>
+  {chat_history}
+</chat_history>
+
+Follow Up Input: {question}
+Standalone vraag:`;
+
+const QA_NL_TEMPLATE = `Je bent een deskundig onderzoeker. Gebruik de volgende stukken context om de vraag aan het einde te beantwoorden.
+Als je het antwoord niet weet, zeg gewoon dat je het niet weet. PROBEER GEEN antwoord te verzinnen.
+Als de vraag niet gerelateerd is aan de context of chatgeschiedenis, reageer dan beleefd dat je alleen vragen beantwoordt die gerelateerd zijn aan de context.
+
+<context>
+  {context}
+</context>
+
+<chat_history>
+  {chat_history}
+</chat_history>
+
+Question: {question}
+Behulpzaam antwoord in markdown:`;
+
 const combineDocumentsFn = (docs: Document[], separator = '\n\n') => {
   const serializedDocs = docs.map((doc) => doc.pageContent);
   return serializedDocs.join(separator);
@@ -40,7 +64,7 @@ export const makeChain = (retriever: VectorStoreRetriever) => {
   const answerPrompt = ChatPromptTemplate.fromTemplate(QA_TEMPLATE);
 
   const model = new ChatOpenAI({
-    temperature: 0, // increase temperature to get more creative answers
+    temperature: 0.2,
     modelName: 'gpt-3.5-turbo', //change this to gpt-4 if you have access
   });
 

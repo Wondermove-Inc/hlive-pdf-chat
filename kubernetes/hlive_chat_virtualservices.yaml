@@ -1,0 +1,19 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: hlive-chat
+  namespace: hlive-chat
+spec:
+  gateways:
+  - hlive-chat-gateway
+  hosts:
+  - hlive-chat.wondermove.net
+  http:
+  - match:
+    - uri:
+        prefix: /
+    route:
+    - destination:
+        host: hlive-chat-service
+        port:
+          number: 8503

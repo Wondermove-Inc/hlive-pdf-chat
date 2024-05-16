@@ -97,3 +97,6 @@ In general, keep an eye out in the `issues` and `discussions` section of this re
 ## Credit
 
 Frontend of this repo is inspired by [langchain-chat-nextjs](https://github.com/zahidkhawaja/langchain-chat-nextjs)
+
+
+http://hlive-chat.wondermove.net/.well-known/acme-challenge/wk3X_DjAVWNdmzOaWNClAq258w3iIPtuJzJ3r7cEJCk
