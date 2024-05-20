@@ -89,24 +89,31 @@ export default async function handler(
     // });
     res.status(200).json({
       text: response,
-      sourceDocuments: query_result
-        .map(([doc, score]) => ({ ...doc, accuracy: score }))
-        .reduce(
-          (uniqueDocs: any, currentDoc) => {
-            // Use a set to track sources we've already added to the uniqueDocs array
-            uniqueDocs.set = uniqueDocs.set || new Set();
-            const src = currentDoc.metadata.source;
-
-            // Check if the source has already been processed
-            if (!uniqueDocs.set.has(src)) {
-              uniqueDocs.set.add(src);
-              uniqueDocs.result.push(currentDoc);
-            }
-            return uniqueDocs;
-          },
-          { result: [], set: null },
-        ).result, // Initialize with an empty result array and a set // Extract the result array containing unique documents
+      sourceDocuments: query_result.map(([doc, score]) => ({
+        ...doc,
+        accuracy: score,
+      })),
     });
+    // res.status(200).json({
+    //   text: response,
+    //   sourceDocuments: query_result
+    //     .map(([doc, score]) => ({ ...doc, accuracy: score }))
+    //     .reduce(
+    //       (uniqueDocs: any, currentDoc) => {
+    //         // Use a set to track sources we've already added to the uniqueDocs array
+    //         uniqueDocs.set = uniqueDocs.set || new Set();
+    //         const src = currentDoc.metadata.source;
+
+    //         // Check if the source has already been processed
+    //         if (!uniqueDocs.set.has(src)) {
+    //           uniqueDocs.set.add(src);
+    //           uniqueDocs.result.push(currentDoc);
+    //         }
+    //         return uniqueDocs;
+    //       },
+    //       { result: [], set: null },
+    //     ).result, // Initialize with an empty result array and a set // Extract the result array containing unique documents
+    // });
   } catch (error: any) {
     console.error('Error:', error);
     res.status(500).json({ error: error.message || 'Something went wrong' });
