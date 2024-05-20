@@ -8,8 +8,8 @@ import LoadingDots from '@/components/ui/LoadingDots';
 import { Document } from 'langchain/document';
 import {
   Accordion,
-  AccordionContent,
   AccordionItem,
+  AccordionContent,
   AccordionTrigger,
 } from '@/components/ui/accordion';
 
@@ -25,6 +25,7 @@ export default function Home() {
   }>({
     messages: [
       {
+        // message: '안녕하세요, 문서에 관해 알고 싶은 질문이 있으신가요?',
         message: 'Hi, what would you like to learn about this document?',
         // message: 'Hallo, waar zou je meer over willen leren in dit document?',
         type: 'apiMessage',
@@ -42,7 +43,7 @@ export default function Home() {
     textAreaRef.current?.focus();
   }, []);
 
-  //handle form submission
+  // handle form submission
   async function handleSubmit(e: any) {
     e.preventDefault();
 
@@ -81,8 +82,47 @@ export default function Home() {
           history,
         }),
       });
+
       const data = await response.json();
-      console.log('data', data);
+
+      console.log(data.sourceDocuments[0].accuracy);
+
+      // Accuracy 0.7 이상일 경우
+      if (
+        data.sourceDocuments[0].metadata.source ===
+          '/Users/changkeunlee/Documents/AI_PROJECT/hlive_chat/docs/2022-Ioniq-5-Owners-Manual.pdf' &&
+        data.sourceDocuments[0].accuracy >= 0.8
+      ) {
+        alert('Searching in Ioniq 5 Manual.');
+      }
+
+      if (
+        data.sourceDocuments[0].metadata.source ===
+          '/Users/changkeunlee/Documents/AI_PROJECT/hlive_chat/docs/vehicle_color.pdf' &&
+        data.sourceDocuments[0].accuracy >= 0.8
+      ) {
+        alert('getVehicleColor API');
+      }
+
+      if (
+        data.sourceDocuments[0].metadata.source ===
+          '/Users/changkeunlee/Documents/AI_PROJECT/hlive_chat/docs/vehicle_modellist.pdf' &&
+        data.sourceDocuments[0].accuracy >= 0.8
+      ) {
+        alert('getVehicleModellist API');
+      }
+
+      if (
+        data.sourceDocuments[0].metadata.source ===
+          '/Users/changkeunlee/Documents/AI_PROJECT/hlive_chat/docs/vehicle_price.pdf' &&
+        data.sourceDocuments[0].accuracy >= 0.8
+      ) {
+        alert('getVehiclePrice API');
+      }
+
+      if (data.sourceDocuments[0].accuracy < 0.8) {
+        alert('Response with LLM');
+      }
 
       if (data.error) {
         setError(data.error);
@@ -100,12 +140,14 @@ export default function Home() {
           history: [...state.history, [question, data.text]],
         }));
       }
-      console.log('messageState', messageState);
 
       setLoading(false);
 
-      //scroll to bottom
-      messageListRef.current?.scrollTo(0, messageListRef.current.scrollHeight);
+      if (data.sourceDocuments)
+        messageListRef.current?.scrollTo(
+          0,
+          messageListRef.current.scrollHeight,
+        );
     } catch (error) {
       setLoading(false);
       setError('An error occurred while fetching the data. Please try again.');
@@ -127,8 +169,8 @@ export default function Home() {
       <Layout>
         <div className="mx-auto flex flex-col gap-4">
           <h1 className="text-2xl font-bold leading-[1.1] tracking-tighter text-center">
-            {/* Chat With Your Docs */}
-            Praat met je Documenten
+            Chat With Your Docs
+            {/* Praat met je Documenten */}
           </h1>
           <main className={styles.main}>
             <div className={styles.cloud}>
@@ -227,7 +269,7 @@ export default function Home() {
                     placeholder={
                       loading
                         ? 'Waiting for response...'
-                        : 'What is this legal case about?'
+                        : 'Please input your question'
                       //   'Wachten op antwoord...'
                       // : 'Waar gaat deze juridische zaak over?'
                     }
@@ -245,7 +287,6 @@ export default function Home() {
                         <LoadingDots color="#000" />
                       </div>
                     ) : (
-                      // Send icon SVG in input field
                       <svg
                         viewBox="0 0 20 20"
                         className={styles.svgicon}
@@ -266,9 +307,7 @@ export default function Home() {
           </main>
         </div>
         <footer className="m-auto p-4">
-          <a href="https://twitter.com/mayowaoshin">
-            Powered by LangChainAI. Demo built by Wondermove Inc.
-          </a>
+          <a href="">Powered by LangChainAI. Demo built by Wondermove Inc.</a>
         </footer>
       </Layout>
     </>

@@ -100,3 +100,133 @@ Frontend of this repo is inspired by [langchain-chat-nextjs](https://github.com/
 
 
 http://hlive-chat.wondermove.net/.well-known/acme-challenge/wk3X_DjAVWNdmzOaWNClAq258w3iIPtuJzJ3r7cEJCk
+
+
+예, 가능합니다. 채팅을 잠깐 멈추고 외부 API 호출을 한 다음 그 데이터를 기반으로 GPT에게 답변을 요청할 수 있습니다. 이 과정을 예시로 설명하겠습니다.
+
+1. 외부 API를 호출하는 로직 추가
+2. API 결과를 활용해 GPT에게 질문하는 곳에 해당 데이터를 포함
+
+먼저, 외부 API를 호출하는 로직을 추가합니다. `fetchExternalData`라는 함수를 만들어 API를 호출하고 결과를 받아옵니다.
+
+```javascript
+async function fetchExternalData(query) {
+  // 예시로 API endpoint와 호출 방식을 작성합니다.
+  const response = await fetch(`https://api.example.com/data?query=${query}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer YOUR_API_KEY'
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch external data');
+  }
+
+  return await response.json();
+}
+```
+
+그리고, API의 결과를 바탕으로 GPT에게 질문을 할 수 있게 `handler` 함수에 해당 로직을 추가합니다.
+
+```javascript
+import type { NextApiRequest, NextApiResponse } from 'next';
+import type { Document } from 'langchain/document';
+import { OpenAIEmbeddings } from 'langchain/embeddings/openai';
+import { PineconeStore } from 'langchain/vectorstores/pinecone';
+import { makeChain } from '@/utils/makechain';
+import { pinecone } from '@/utils/pinecone-client';
+import { PINECONE_INDEX_NAME, PINECONE_NAME_SPACE } from '@/config/pinecone';
+
+async function fetchExternalData(query) {
+  const response = await fetch(`https://api.example.com/data?query=${query}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer YOUR_API_KEY'
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch external data');
+  }
+
+  return await response.json();
+}
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse,
+) {
+  const { question, history } = req.body;
+
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed' });
+    return;
+  }
+
+  if (!question) {
+    return res.status(400).json({ message: 'No question in the request' });
+  }
+
+  const sanitizedQuestion = question.trim().replaceAll('\n', ' ');
+
+  try {
+    const index = pinecone.Index(PINECONE_INDEX_NAME);
+
+    /* create vectorstore */
+    const vectorStore = await PineconeStore.fromExistingIndex(
+      new OpenAIEmbeddings({}),
+      {
+        pineconeIndex: index,
+        textKey: 'text',
+        namespace: PINECONE_NAME_SPACE,
+      },
+    );
+
+    let resolveWithDocuments: (value: Document[]) => void;
+    const documentPromise = new Promise<Document[]>((resolve) => {
+      resolveWithDocuments = resolve;
+    });
+
+    const retriever = vectorStore.asRetriever({
+      callbacks: [
+        {
+          handleRetrieverEnd(documents) {
+            resolveWithDocuments(documents);
+          },
+        },
+      ],
+    });
+
+    console.log("RETRIEVER : ", retriever)
+
+    const chain = makeChain(retriever);
+
+    const pastMessages = history
+      .map((message: [string, string]) => {
+        return [`Human: ${message[0]}`, `Assistant: ${message[1]}`].join('\n');
+      })
+      .join('\n');
+
+    // 외부 API에서 데이터를 가져온다.
+    const externalData = await fetchExternalData(sanitizedQuestion);
+    const extendedQuestion = `${sanitizedQuestion}\n정보: ${JSON.stringify(externalData)}`;
+
+    const response = await chain.invoke({
+      question: extendedQuestion,
+      chat_history: pastMessages,
+    });
+
+    const sourceDocuments = await documentPromise;
+
+    res.status(200).json({ text: response, sourceDocuments });
+  } catch (error: any) {
+    console.log('error', error);
+    res.status(500).json({ error: error.message || 'Something went wrong' });
+  }
+}
+```
+
+이 코드는 사용자의 질문(`question`)을 외부 API로 먼저 보내서 추가적인 데이터를 가져온 뒤, 그 데이터를 포함하여 GPT에게 최종 질문을 합니다. 이를 통해 외부 API 데이터까지 반영된 답변을 얻을 수 있습니다.

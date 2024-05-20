@@ -6,7 +6,7 @@ import { PDFLoader } from 'langchain/document_loaders/fs/pdf';
 import { PINECONE_INDEX_NAME, PINECONE_NAME_SPACE } from '@/config/pinecone';
 import { DirectoryLoader } from 'langchain/document_loaders/fs/directory';
 
-const filePath = 'docs_nl';
+const filePath = 'docs';
 
 export const run = async () => {
   try {
@@ -22,25 +22,23 @@ export const run = async () => {
     });
 
     const docs = await textSplitter.splitDocuments(rawDocs);
-    console.log('split docs', docs);
-    console.log('creating vector store...');
 
     const embeddings = new OpenAIEmbeddings();
-    const index = pinecone.Index(PINECONE_INDEX_NAME); //change to your own index name
+    const index = pinecone.Index(PINECONE_INDEX_NAME);
 
-    //embed the PDF documents
+    // Embed the PDF documents
     await PineconeStore.fromDocuments(docs, embeddings, {
       pineconeIndex: index,
       namespace: PINECONE_NAME_SPACE,
       textKey: 'text',
     });
   } catch (error) {
-    console.log('error', error);
+    console.error('error', error);
     throw new Error('Failed to ingest your data');
   }
 };
 
 (async () => {
   await run();
-  console.log('ingestion complete');
+  console.log('Ingestion complete');
 })();

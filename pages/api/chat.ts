@@ -1,47 +1,66 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import type { Document } from 'langchain/document';
+import type { Document } from 'langchain/document'; // Ensure this is correctly defined
 import { OpenAIEmbeddings } from 'langchain/embeddings/openai';
 import { PineconeStore } from 'langchain/vectorstores/pinecone';
 import { makeChain } from '@/utils/makechain';
 import { pinecone } from '@/utils/pinecone-client';
 import { PINECONE_INDEX_NAME, PINECONE_NAME_SPACE } from '@/config/pinecone';
 
+type MessagePair = [string, string];
+type History = MessagePair[];
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse,
 ) {
-  const { question, history } = req.body;
-
-  //only accept post requests
   if (req.method !== 'POST') {
-    res.status(405).json({ error: 'Method not allowed' });
-    return;
+    return res.status(405).json({ error: 'Method not allowed' });
   }
+
+  const { question, history }: { question?: string; history?: History } =
+    req.body;
 
   if (!question) {
     return res.status(400).json({ message: 'No question in the request' });
   }
-  // OpenAI recommends replacing newlines with spaces for best results
+
+  const pastMessages =
+    history
+      ?.map(([userMsg, botMsg]) => `Human: ${userMsg}\nAssistant: ${botMsg}`)
+      .join('\n') ?? '';
+
   const sanitizedQuestion = question.trim().replaceAll('\n', ' ');
 
   try {
+    const embeddings = new OpenAIEmbeddings({
+      modelName: 'text-embedding-ada-002',
+      batchSize: 4,
+      stripNewLines: true,
+    });
+
     const index = pinecone.Index(PINECONE_INDEX_NAME);
 
-    /* create vectorstore*/
-    const vectorStore = await PineconeStore.fromExistingIndex(
-      new OpenAIEmbeddings({}),
-      {
-        pineconeIndex: index,
-        textKey: 'text',
-        namespace: PINECONE_NAME_SPACE,
-      },
-    );
+    const vectorStore = await PineconeStore.fromExistingIndex(embeddings, {
+      pineconeIndex: index,
+      textKey: 'text',
+      namespace: PINECONE_NAME_SPACE,
+    });
 
-    // Use a callback to get intermediate sources from the middle of the chain
     let resolveWithDocuments: (value: Document[]) => void;
+
     const documentPromise = new Promise<Document[]>((resolve) => {
       resolveWithDocuments = resolve;
     });
+
+    const queryVector = await embeddings.embedQuery(sanitizedQuestion);
+    const k = 10;
+    const filter = {};
+    const query_result = await vectorStore.similaritySearchVectorWithScore(
+      queryVector,
+      k,
+      filter,
+    );
+
     const retriever = vectorStore.asRetriever({
       callbacks: [
         {
@@ -52,27 +71,44 @@ export default async function handler(
       ],
     });
 
-    //create chain
     const chain = makeChain(retriever);
 
-    const pastMessages = history
-      .map((message: [string, string]) => {
-        return [`Human: ${message[0]}`, `Assistant: ${message[1]}`].join('\n');
-      })
-      .join('\n');
-
-    //Ask a question using chat history
     const response = await chain.invoke({
       question: sanitizedQuestion,
       chat_history: pastMessages,
     });
 
-    const sourceDocuments = await documentPromise;
+    let sourceDocuments = await documentPromise;
 
-    console.log('response', response);
-    res.status(200).json({ text: response, sourceDocuments });
+    console.log('SOURCE DOCUMENTS : ', sourceDocuments);
+    console.log('QUERY RESULT : ', query_result);
+
+    // sourceDocuments = sourceDocuments.map((doc, index) => {
+    //   const score = query_result[index]?.[1];
+    //   return { ...doc, accuracy: score };
+    // });
+    res.status(200).json({
+      text: response,
+      sourceDocuments: query_result
+        .map(([doc, score]) => ({ ...doc, accuracy: score }))
+        .reduce(
+          (uniqueDocs: any, currentDoc) => {
+            // Use a set to track sources we've already added to the uniqueDocs array
+            uniqueDocs.set = uniqueDocs.set || new Set();
+            const src = currentDoc.metadata.source;
+
+            // Check if the source has already been processed
+            if (!uniqueDocs.set.has(src)) {
+              uniqueDocs.set.add(src);
+              uniqueDocs.result.push(currentDoc);
+            }
+            return uniqueDocs;
+          },
+          { result: [], set: null },
+        ).result, // Initialize with an empty result array and a set // Extract the result array containing unique documents
+    });
   } catch (error: any) {
-    console.log('error', error);
+    console.error('Error:', error);
     res.status(500).json({ error: error.message || 'Something went wrong' });
   }
 }
